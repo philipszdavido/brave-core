@@ -1,8 +1,19 @@
 diff --git a/chrome/browser/resources/settings/settings_ui/settings_ui.html b/chrome/browser/resources/settings/settings_ui/settings_ui.html
-index 88d91ba73e146bdefdb2c51b84f49ea4be934aad..f491000d6d9c72101b65e5e02a80a28fa2cfec0f 100644
+index 88d91ba73e146bdefdb2c51b84f49ea4be934aad..2cac764ba9a2687c365ecaa52fe3deb16f5ff397 100644
 --- a/chrome/browser/resources/settings/settings_ui/settings_ui.html
 +++ b/chrome/browser/resources/settings/settings_ui/settings_ui.html
-@@ -61,24 +61,20 @@
+@@ -48,6 +48,10 @@
+         flex: 1;
+         overflow: overlay;
+         position: relative;
++        text-align: center;
++      }
++      #container > * {
++        text-align: left;
+       }
+     </style>
+     <settings-prefs id="prefs" prefs="{{prefs}}"></settings-prefs>
+@@ -61,23 +65,17 @@
          role="banner"
          show-menu>
      </cr-toolbar>
@@ -22,10 +33,8 @@ index 88d91ba73e146bdefdb2c51b84f49ea4be934aad..f491000d6d9c72101b65e5e02a80a28f
 -        </template>
 -      </div>
 -    </cr-drawer>
--    <div id="container" class="no-outline">
-+    <div id="container" class="no-outline" style="text-align: center;">
+     <div id="container" class="no-outline">
 +      <settings-menu
-+          style="display: inline-block; vertical-align: top; text-align: left;"
 +          page-visibility="[[pageVisibility_]]"
 +          show-android-apps="[[showAndroidApps_]]"
 +          show-crostini="[[showCrostini_]]"
@@ -36,7 +45,5 @@ index 88d91ba73e146bdefdb2c51b84f49ea4be934aad..f491000d6d9c72101b65e5e02a80a28f
 +          advanced-opened="{{advancedOpened_}}">
 +      </settings-menu>
        <settings-main id="main" prefs="{{prefs}}"
-+          style="display: inline-block; text-align: left;"
            toolbar-spinner-active="{{toolbarSpinnerActive_}}"
            page-visibility="[[pageVisibility_]]"
-           show-android-apps="[[showAndroidApps_]]"

@@ -1164,7 +1164,8 @@ void BraveSyncServiceImpl::BookmarkNodeChildrenReordered(bookmarks::BookmarkMode
 void BraveSyncServiceImpl::BookmarkAllUserNodesRemoved(
     bookmarks::BookmarkModel* model,
     const std::set<GURL>& removed_urls) {
-  // TODO(bridiver)
+  // this only happens on profile deletion and we don't want
+  // to wipe out the remote store when that happens
 }
 
 void BraveSyncServiceImpl::BookmarkNodeMoved(

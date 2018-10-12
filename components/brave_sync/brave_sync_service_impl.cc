@@ -1153,7 +1153,7 @@ void BraveSyncServiceImpl::BookmarkModelLoaded(
 
 void BraveSyncServiceImpl::BookmarkNodeFaviconChanged(bookmarks::BookmarkModel* model,
     const bookmarks::BookmarkNode* node) {
-  // TODO(bridiver)
+  BookmarkNodeChanged(model, node);
 }
 
 void BraveSyncServiceImpl::BookmarkNodeChildrenReordered(bookmarks::BookmarkModel* model,

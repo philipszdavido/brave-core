@@ -260,10 +260,10 @@ void BraveSyncServiceImpl::OnDeleteDeviceFileWork(const std::string &device_id) 
     LOG(ERROR) << "TAGAB brave_sync::BraveSyncServiceImpl::OnDeleteDeviceFileWork device_name="<<device_name;
     LOG(ERROR) << "TAGAB brave_sync::BraveSyncServiceImpl::OnDeleteDeviceFileWork object_id="<<object_id;
 
-    SendDeviceSyncRecord(jslib::SyncRecord::Action::DELETE,
-      device_name,
-      device_id,
-      object_id);
+    content::BrowserThread::PostTask(content::BrowserThread::UI, FROM_HERE,
+        base::Bind(&BraveSyncServiceImpl::SendDeviceSyncRecord,
+            weak_ptr_factory_.GetWeakPtr(), jslib::SyncRecord::Action::DELETE,
+            device_name, device_id, object_id));
   }
 }
 
@@ -294,7 +294,7 @@ void BraveSyncServiceImpl::OnResetSyncFileWork(const std::string &device_id) {
 
   content::BrowserThread::PostTask(content::BrowserThread::UI, FROM_HERE,
     base::Bind(&BraveSyncServiceImpl::OnResetSyncPostFileUiWork,
-               base::Unretained(this)));
+               weak_ptr_factory_.GetWeakPtr()));
 }
 
 void BraveSyncServiceImpl::OnResetSyncPostFileUiWork() {
@@ -337,8 +337,9 @@ void BraveSyncServiceImpl::GetSettingsAndDevicesImpl(std::unique_ptr<brave_sync:
 
   // Jump back to UI with an answer
   content::BrowserThread::PostTask(content::BrowserThread::UI, FROM_HERE,
-    base::Bind(callback, base::Passed(std::move(settings)),
-               base::Passed(std::move(devices)))
+      base::Bind(callback,
+          base::Passed(std::move(settings)),
+          base::Passed(std::move(devices)))
   );
 }
 
@@ -544,13 +545,24 @@ void BraveSyncServiceImpl::OnGetExistingObjectsFileWork(const std::string& categ
   if (category_name == jslib_const::kPreferences) {
     SyncRecordAndExistingList records_and_existing_objects =
                                      PrepareResolvedPreferences(*records.get());
-    sync_client_->SendResolveSyncRecords(category_name,
-                                         records_and_existing_objects);
+    content::BrowserThread::GetTaskRunnerForThread(content::BrowserThread::UI)
+        ->PostTask(FROM_HERE, base::BindOnce(
+            &BraveSyncServiceImpl::OnGetExistingObjectsOnUIThread,
+                weak_ptr_factory_.GetWeakPtr(),
+                category_name,
+                base::Passed(std::move(records_and_existing_objects))));
   } else if (category_name == jslib_const::kHistorySites) {
     NOTIMPLEMENTED();
   } else {
     NOTREACHED();
   }
+}
+
+void BraveSyncServiceImpl::OnGetExistingObjectsOnUIThread(
+    const std::string& category_name,
+    SyncRecordAndExistingList records_and_existing_objects) {
+  sync_client_->SendResolveSyncRecords(category_name,
+                                       records_and_existing_objects);
 }
 
 SyncRecordAndExistingList BraveSyncServiceImpl::PrepareResolvedPreferences(
@@ -674,7 +686,7 @@ void BraveSyncServiceImpl::OnResolvedPreferences(std::unique_ptr<RecordsList> re
 
   content::BrowserThread::GetTaskRunnerForThread(content::BrowserThread::UI)
     ->PostTask(FROM_HERE, base::Bind(&BraveSyncServiceImpl::TriggerOnSyncStateChanged,
-                                     base::Unretained(this)));
+                                     weak_ptr_factory_.GetWeakPtr()));
 
   DLOG(INFO) << "[Brave Sync] OnResolvedPreferences OnSyncStateChanged() done";
 }

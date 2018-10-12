@@ -195,6 +195,8 @@ class BraveSyncServiceImpl : public BraveSyncService,
     std::unique_ptr<RecordsList> records,
     const base::Time& last_record_time_stamp,
     bool is_truncated);
+  void OnGetExistingObjectsOnUIThread(const std::string& category_name,
+      SyncRecordAndExistingList records_and_existing_objects);
   SyncRecordAndExistingList PrepareResolvedPreferences(const RecordsList& records);
   SyncRecordPtr PrepareResolvedDevice(const std::string& object_id, int action);
 

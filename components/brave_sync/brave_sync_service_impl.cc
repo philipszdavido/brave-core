@@ -1083,9 +1083,12 @@ void BraveSyncServiceImpl::GetExistingBookmarks(
 void BraveSyncServiceImpl::SendUnsyncedBookmarks() {
   std::vector<std::unique_ptr<jslib::SyncRecord>> records;
 
+  auto* deleted_node = GetDeletedNodeRoot();
+  CHECK(deleted_node);
   std::vector<const bookmarks::BookmarkNode*> root_nodes = {
     bookmark_model_->other_node(),
     bookmark_model_->bookmark_bar_node(),
+    deleted_node
   };
 
   for (const auto* root_node : root_nodes) {

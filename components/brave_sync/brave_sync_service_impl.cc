@@ -856,7 +856,7 @@ void BraveSyncServiceImpl::OnSaveBookmarkOrder(const std::string &order,
                                                const std::string &next_order,
                                                const std::string &parent_order) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  DCHECK(!prev_order.empty() || !next_order.empty());
+  DCHECK(!order.empty());
 
   int64_t between_order_rr_context_node_id = -1;
   int action = -1;
@@ -875,13 +875,13 @@ void BraveSyncServiceImpl::OnSaveBookmarkOrder(const std::string &order,
     BookmarkNodeChanged(bookmark_model_, bookmark_node);
   }
 
-  --initial_sync_records_remaining_;
-
   base::Time last_fetch_time = sync_prefs_->GetLastFetchTime();
-  if (tools::IsTimeEmpty(last_fetch_time) &&
-      initial_sync_records_remaining_ == 0) {
-    sync_prefs_->SetLastFetchTime(base::Time::Now());
-    RequestSyncData();
+  if (tools::IsTimeEmpty(last_fetch_time)) {
+    --initial_sync_records_remaining_;
+    if (initial_sync_records_remaining_ == 0) {
+      sync_prefs_->SetLastFetchTime(base::Time::Now());
+      RequestSyncData();
+    }
   }
 }
 
@@ -1223,6 +1223,7 @@ void BraveSyncServiceImpl::BookmarkNodeMoved(
   std::string parent_node_order;
   GetOrder(new_parent, new_index,
            &prev_node_order, &next_node_order, &parent_node_order);
+
   PushRRContext(
       prev_node_order, next_node_order, parent_node_order,
       node->id(), jslib_const::kActionUpdate);
@@ -1241,6 +1242,12 @@ void BraveSyncServiceImpl::BookmarkNodeAdded(bookmarks::BookmarkModel* model,
   std::string parent_node_order;
   GetOrder(parent, index,
            &prev_node_order, &next_node_order, &parent_node_order);
+
+  // this is a giant hack and have an empty value for all 3 should
+  // be handled in the sync js lib
+  if (parent_node_order.empty())
+    parent_node_order =
+        sync_prefs_->GetBookmarksBaseOrder() + std::to_string(index);
 
   PushRRContext(
       prev_node_order, next_node_order, parent_node_order,

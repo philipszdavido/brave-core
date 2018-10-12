@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/resources/settings/settings_menu/settings_menu.html b/chrome/browser/resources/settings/settings_menu/settings_menu.html
-index f8f22e9b9c95a9355abe36a173ad10c615a9a85f..77ef589ae3f91ab3d2d85889e3aa40e86724c0dd 100644
+index f8f22e9b9c95a9355abe36a173ad10c615a9a85f..539ac2ce912ca09091a5612ec218f5297e3a73cb 100644
 --- a/chrome/browser/resources/settings/settings_menu/settings_menu.html
 +++ b/chrome/browser/resources/settings/settings_menu/settings_menu.html
 @@ -10,23 +10,32 @@
@@ -111,8 +111,12 @@ index f8f22e9b9c95a9355abe36a173ad10c615a9a85f..77ef589ae3f91ab3d2d85889e3aa40e8
  <if expr="chromeos">
        <a href="/internet">
          <iron-icon icon="settings:network-wifi"></iron-icon>
-@@ -104,10 +144,11 @@
-         <iron-icon icon="cr:person"></iron-icon>
+@@ -101,13 +141,14 @@
+       </a>
+ </if>
+       <a id="people" href="/people" hidden="[[!pageVisibility.people]]">
+-        <iron-icon icon="cr:person"></iron-icon>
++        <iron-icon icon="brave_settings:logos-thumbs-up"></iron-icon>
          $i18n{peoplePageTitle}
        </a>
 -      <a id="appearance" href="/appearance"
@@ -127,16 +131,21 @@ index f8f22e9b9c95a9355abe36a173ad10c615a9a85f..77ef589ae3f91ab3d2d85889e3aa40e8
        </a>
  <if expr="chromeos">
        <a href="/device">
-@@ -116,7 +157,7 @@
+@@ -115,8 +156,12 @@
+         $i18n{devicePageTitle}
        </a>
  </if>
++      <a href="/shields">
++        <iron-icon icon="brave_settings:shields-success-o"></iron-icon>
++        SHIELDS
++      </a>
        <a href="/search">
 -        <iron-icon icon="cr:search"></iron-icon>
 +        <iron-icon icon="brave_settings:mag-glass-search"></iron-icon>
          $i18n{searchPageTitle}
        </a>
  <if expr="chromeos">
-@@ -143,6 +184,11 @@
+@@ -143,6 +188,11 @@
          <iron-icon icon="settings:power-settings-new"></iron-icon>
          $i18n{onStartup}
        </a>
@@ -148,7 +157,26 @@ index f8f22e9b9c95a9355abe36a173ad10c615a9a85f..77ef589ae3f91ab3d2d85889e3aa40e8
        <paper-button toggles id="advancedButton"
            aria-active-attribute="aria-expanded" active="{{advancedOpened}}"
            hidden="[[!pageVisibility.advancedSettings]]">
-@@ -188,10 +234,12 @@
+@@ -171,15 +221,15 @@
+             </a>
+           </template>
+           <a href="/languages">
+-            <iron-icon icon="settings:language"></iron-icon>
++            <iron-icon icon="brave_settings:misc-language"></iron-icon>
+             $i18n{languagesPageTitle}
+           </a>
+           <a href="/downloads">
+-            <iron-icon icon="cr:file-download"></iron-icon>
++            <iron-icon icon="brave_settings:arrows-download"></iron-icon>
+             $i18n{downloadsPageTitle}
+           </a>
+           <a href="/printing">
+-            <iron-icon icon="cr:print"></iron-icon>
++            <iron-icon icon="brave_settings:misc-printer"></iron-icon>
+             $i18n{printingPageTitle}
+           </a>
+ <if expr="chromeos">
+@@ -188,30 +238,32 @@
              $i18n{multidevicePageTitle}
            </a>
  </if>
@@ -160,8 +188,16 @@ index f8f22e9b9c95a9355abe36a173ad10c615a9a85f..77ef589ae3f91ab3d2d85889e3aa40e8
 +</if>
  <if expr="not chromeos">
            <a href="/system">
-             <iron-icon icon="settings:build"></iron-icon>
-@@ -205,13 +253,13 @@
+-            <iron-icon icon="settings:build"></iron-icon>
++            <iron-icon icon="brave_settings:square-monitor"></iron-icon>
+             $i18n{systemPageTitle}
+           </a>
+ </if>
+           <a id="reset" href="/reset" hidden="[[!pageVisibility.reset]]">
+-            <iron-icon icon="settings:restore"></iron-icon>
++            <iron-icon icon="brave_settings:arrows-shift-left"></iron-icon>
+             $i18n{resetPageTitle}
+           </a>
          </iron-selector>
        </iron-collapse>
        <div id="menuSeparator"></div>

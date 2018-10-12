@@ -75,6 +75,7 @@ BraveSyncServiceImpl::BraveSyncServiceImpl(Profile *profile) :
   sync_words_(std::string()),
   profile_(profile),
   timer_(std::make_unique<base::RepeatingTimer>()),
+  unsynced_send_interval_(base::TimeDelta::FromMinutes(10)),
   bookmark_model_(BookmarkModelFactory::GetForBrowserContext(profile)),
   weak_ptr_factory_(this) {
   LOG(ERROR) << "TAGAB brave_sync::BraveSyncServiceImpl::BraveSyncServiceImpl CTOR";
@@ -471,6 +472,7 @@ void BraveSyncServiceImpl::OnResetBookmarks() {
     bookmark_model_->DeleteNodeMetaInfo(node, "object_id");
     bookmark_model_->DeleteNodeMetaInfo(node, "order");
     bookmark_model_->DeleteNodeMetaInfo(node, "sync_timestamp");
+    bookmark_model_->DeleteNodeMetaInfo(node, "last_send_time");
   }
   auto* deleted_node = GetDeletedNodeRoot();
   CHECK(deleted_node);
@@ -711,6 +713,7 @@ void UpdateNode(bookmarks::BookmarkModel* model,
     model->SetNodeMetaInfo(node,
         "sync_timestamp",
         std::to_string(record->syncTimestamp.ToJsTime()));
+    model->DeleteNodeMetaInfo(node, "last_send_time");
   }
 }
 
@@ -840,9 +843,9 @@ void BraveSyncServiceImpl::OnSaveBookmarkOrder(const std::string &order,
   auto* bookmark_node = bookmarks::GetBookmarkNodeByID(
       bookmark_model_, between_order_rr_context_node_id);
 
-  // clearing the sync_timestamp will put the record back in the `unsynced` list
-  if (bookmark_node)
-    bookmark_model_->DeleteNodeMetaInfo(bookmark_node, "sync_timestamp");
+  if (bookmark_node) {
+    BookmarkNodeChanged(bookmark_model_, bookmark_node);
+  }
 }
 
 void BraveSyncServiceImpl::PushRRContext(const std::string &prev_order, const std::string &next_order, const int64_t &node_id, const int &action) {
@@ -1101,6 +1104,16 @@ void BraveSyncServiceImpl::SendUnsyncedBookmarks() {
       if (!sync_timestamp.empty())
         continue;
 
+      std::string last_send_time;
+      node->GetMetaInfo("last_send_time", &last_send_time);
+      if (!last_send_time.empty() &&
+          // don't send more often than unsynced_send_interval_
+          base::Time::Now() - base::Time::FromJsTime(std::stod(last_send_time)) <
+          unsynced_send_interval_)
+        continue;
+
+      bookmark_model_->SetNodeMetaInfo(node,
+          "last_send_time", std::to_string(base::Time::Now().ToJsTime()));
       auto record = BookmarkNodeToSyncBookmark(node);
       if (record)
         records.push_back(std::move(record));
@@ -1246,6 +1259,8 @@ void BraveSyncServiceImpl::BookmarkNodeChanged(bookmarks::BookmarkModel* model,
                                           const bookmarks::BookmarkNode* node) {
   // clearing the sync_timestamp will put the record back in the `Unsynced` list
   model->DeleteNodeMetaInfo(node, "sync_timestamp");
+  // also clear the last send time because this is a new change
+  model->DeleteNodeMetaInfo(node, "last_send_time");
 }
 
 void BraveSyncServiceImpl::SendAllLocalHistorySites() {

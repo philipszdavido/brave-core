@@ -241,6 +241,7 @@ class BraveSyncServiceImpl : public BraveSyncService,
   int attempts_before_send_not_synced_records_ = ATTEMPTS_BEFORE_SENDING_NOT_SYNCED_RECORDS;
 
   std::unique_ptr<base::RepeatingTimer> timer_;
+  base::TimeDelta unsynced_send_interval_;
   bookmarks::BookmarkModel* bookmark_model_;
   scoped_refptr<base::SequencedTaskRunner> task_runner_;
   SEQUENCE_CHECKER(sequence_checker_);

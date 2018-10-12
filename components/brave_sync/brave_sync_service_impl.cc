@@ -1151,14 +1151,16 @@ void BraveSyncServiceImpl::BookmarkModelLoaded(
   // TODO(bridiver) - do we need to handle ids_reassigned?
 }
 
-void BraveSyncServiceImpl::BookmarkNodeFaviconChanged(bookmarks::BookmarkModel* model,
+void BraveSyncServiceImpl::BookmarkNodeFaviconChanged(
+    bookmarks::BookmarkModel* model,
     const bookmarks::BookmarkNode* node) {
   BookmarkNodeChanged(model, node);
 }
 
-void BraveSyncServiceImpl::BookmarkNodeChildrenReordered(bookmarks::BookmarkModel* model,
+void BraveSyncServiceImpl::BookmarkNodeChildrenReordered(
+    bookmarks::BookmarkModel* model,
     const bookmarks::BookmarkNode* node) {
-  // TODO(bridiver)
+  // this should be safe to ignore as it's only called for managed bookmarks
 }
 
 void BraveSyncServiceImpl::BookmarkAllUserNodesRemoved(

@@ -810,6 +810,13 @@ void BraveSyncServiceImpl::OnResolvedBookmarks(const RecordsList &records) {
           // mobile generated bookmarks go in the mobile folder so they don't get
           // so we don't get m.xxx.xxx domains in the normal bookmarks
           parent_node = bookmark_model_->mobile_node();
+        } else if (!bookmark_record.hideInToolbar) {
+          // this flag is a bit odd, but if the node doesn't have a parent and
+          // hideInToolbar is false, then this bookmark should go in the
+          // toolbar root. We don't care about this flag for records with
+          // a parent id because they will be inserted into the correct
+          // parent folder
+          parent_node = bookmark_model_->bookmark_bar_node();
         } else {
           parent_node = bookmark_model_->other_node();
         }
@@ -1040,6 +1047,8 @@ BraveSyncServiceImpl::BookmarkNodeToSyncBookmark(
   bookmark->site.creationTime = node->date_added();
   bookmark->site.favicon = node->icon_url() ? node->icon_url()->spec() : "";
   bookmark->isFolder = node->is_folder();
+  bookmark->hideInToolbar =
+      !node->HasAncestor(bookmark_model_->bookmark_bar_node());
 
   // these will be empty for unsynced nodes
   std::string sync_timestamp;
@@ -1106,25 +1115,32 @@ void BraveSyncServiceImpl::GetExistingBookmarks(
 void BraveSyncServiceImpl::SendUnsyncedBookmarks() {
   std::vector<std::unique_ptr<jslib::SyncRecord>> records;
 
-  ui::TreeNodeIterator<const bookmarks::BookmarkNode>
-      iterator(bookmark_model_->other_node());
-  while (iterator.has_next()) {
-    const bookmarks::BookmarkNode* node = iterator.Next();
+  std::vector<const bookmarks::BookmarkNode*> root_nodes = {
+    bookmark_model_->other_node(),
+    bookmark_model_->bookmark_bar_node(),
+  };
 
-    // only send unsynced records
-    std::string sync_timestamp;
-    node->GetMetaInfo("sync_timestamp", &sync_timestamp);
-    if (!sync_timestamp.empty())
-      continue;
+  for (const auto* root_node : root_nodes) {
+    ui::TreeNodeIterator<const bookmarks::BookmarkNode>
+        iterator(root_node);
+    while (iterator.has_next()) {
+      const bookmarks::BookmarkNode* node = iterator.Next();
 
-    auto record = BookmarkNodeToSyncBookmark(node);
-    if (record)
-      records.push_back(std::move(record));
+      // only send unsynced records
+      std::string sync_timestamp;
+      node->GetMetaInfo("sync_timestamp", &sync_timestamp);
+      if (!sync_timestamp.empty())
+        continue;
 
-    if (records.size() == 1000) {
-      sync_client_->SendSyncRecords(
-          jslib_const::SyncRecordType_BOOKMARKS, records);
-      records.clear();
+      auto record = BookmarkNodeToSyncBookmark(node);
+      if (record)
+        records.push_back(std::move(record));
+
+      if (records.size() == 1000) {
+        sync_client_->SendSyncRecords(
+            jslib_const::SyncRecordType_BOOKMARKS, records);
+        records.clear();
+      }
     }
   }
 }

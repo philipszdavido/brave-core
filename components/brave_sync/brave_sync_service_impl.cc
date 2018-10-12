@@ -1077,6 +1077,9 @@ BraveSyncServiceImpl::BookmarkNodeToSyncBookmark(
 
     DCHECK(bookmark->order.empty());
     int index = node->parent()->GetIndexOf(node);
+    // TODO(bridiver) - this isn't good because the logic for determining order
+    // shouldn't be in both the sync js lib and the c++ code, but using the
+    // callback here is problematic. Need to find a better way to handle this
     if (node->is_folder()) {
       bookmark->order =
           sync_prefs_->GetBookmarksBaseOrder() +

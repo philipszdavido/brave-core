@@ -1087,6 +1087,7 @@ BraveSyncServiceImpl::BookmarkNodeToSyncBookmark(
       DCHECK(!order.empty());
       bookmark->order = order + "." + std::to_string(index);
     }
+    bookmark_model_->SetNodeMetaInfo(node, "order", bookmark->order);
   } else if (node->HasAncestor(deleted_node)) {
    record->action = jslib::SyncRecord::Action::DELETE;
   } else {

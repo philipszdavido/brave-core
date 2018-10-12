@@ -1060,9 +1060,6 @@ BraveSyncServiceImpl::BookmarkNodeToSyncBookmark(
   std::string parent_object_id;
   node->parent()->GetMetaInfo("object_id", &parent_object_id);
   bookmark->parentFolderObjectId = parent_object_id;
-  // this will be true as long as they are processed in TreeNodeIterator order
-  // However, if object locates at toolbar, prarent folder object id is empty.
-  // DCHECK(!parent_object_id.empty());
 
   std::string order;
   node->GetMetaInfo("order", &order);
@@ -1080,7 +1077,7 @@ BraveSyncServiceImpl::BookmarkNodeToSyncBookmark(
     // TODO(bridiver) - this isn't good because the logic for determining order
     // shouldn't be in both the sync js lib and the c++ code, but using the
     // callback here is problematic. Need to find a better way to handle this
-    if (node->is_folder()) {
+    if (node->parent()->is_permanent_node()) {
       bookmark->order =
           sync_prefs_->GetBookmarksBaseOrder() +
           std::to_string(index);

@@ -269,6 +269,7 @@ class BraveSyncServiceImpl : public BraveSyncService,
 
   std::unique_ptr<base::RepeatingTimer> timer_;
   base::TimeDelta unsynced_send_interval_;
+  uint64_t initial_sync_records_remaining_;
   bookmarks::BookmarkModel* bookmark_model_;
   scoped_refptr<base::SequencedTaskRunner> task_runner_;
   SEQUENCE_CHECKER(sequence_checker_);

@@ -102,6 +102,7 @@ BraveSyncServiceImpl::BraveSyncServiceImpl(Profile *profile) :
   profile_(profile),
   timer_(std::make_unique<base::RepeatingTimer>()),
   unsynced_send_interval_(base::TimeDelta::FromMinutes(10)),
+  initial_sync_records_remaining_(0),
   bookmark_model_(BookmarkModelFactory::GetForBrowserContext(profile)),
   extension_registry_observer_(this),
   weak_ptr_factory_(this) {
@@ -870,7 +871,17 @@ void BraveSyncServiceImpl::OnSaveBookmarkOrder(const std::string &order,
       bookmark_model_, between_order_rr_context_node_id);
 
   if (bookmark_node) {
+    bookmark_model_->SetNodeMetaInfo(bookmark_node, "order", order);
     BookmarkNodeChanged(bookmark_model_, bookmark_node);
+  }
+
+  --initial_sync_records_remaining_;
+
+  base::Time last_fetch_time = sync_prefs_->GetLastFetchTime();
+  if (tools::IsTimeEmpty(last_fetch_time) &&
+      initial_sync_records_remaining_ == 0) {
+    sync_prefs_->SetLastFetchTime(base::Time::Now());
+    RequestSyncData();
   }
 }
 
@@ -912,6 +923,10 @@ void BraveSyncServiceImpl::RequestSyncData() {
     return;
   }
 
+  // still sending sync records
+  if (initial_sync_records_remaining_ > 0)
+    return;
+
   const bool bookmarks = sync_prefs_->GetSyncBookmarksEnabled();
   const bool history = sync_prefs_->GetSyncHistoryEnabled();
   const bool preferences = sync_prefs_->GetSyncSiteSettingsEnabled();
@@ -930,12 +945,36 @@ void BraveSyncServiceImpl::RequestSyncData() {
   LOG(ERROR) << "TAGAB brave_sync::BraveSyncServiceImpl::RequestSyncData: last_fetch_time="<<last_fetch_time;
 
   //bool dbg_ignore_create_device = true; //the logic should rely upon sync_prefs_->GetTimeLastFetch() which is not saved yet
-  if (tools::IsTimeEmpty(last_fetch_time)
-  /*0 == start_at*/ /*&& !dbg_ignore_create_device*/) {
+  if (tools::IsTimeEmpty(last_fetch_time)) {
     //SetUpdateDeleteDeviceName(CREATE_RECORD, mDeviceName, mDeviceId, "");
     SendCreateDevice();
-    SendUnsyncedBookmarks();
+
+    auto* deleted_node = GetDeletedNodeRoot();
+    CHECK(deleted_node);
+    std::vector<const bookmarks::BookmarkNode*> root_nodes = {
+      bookmark_model_->other_node(),
+      bookmark_model_->bookmark_bar_node(),
+      deleted_node
+    };
+
+    std::vector<const bookmarks::BookmarkNode*> sync_nodes;
+    for (const auto* root_node : root_nodes) {
+      ui::TreeNodeIterator<const bookmarks::BookmarkNode>
+          iterator(root_node);
+      while (iterator.has_next())
+        sync_nodes.push_back(iterator.Next());
+    }
+
+    initial_sync_records_remaining_ = sync_nodes.size();
+
+    for (auto* node : sync_nodes)
+      BookmarkNodeAdded(bookmark_model_,
+                        node->parent(),
+                        node->parent()->GetIndexOf(node));
     //SendAllLocalHistorySites();
+
+    if (initial_sync_records_remaining_ > 0)
+      return;
   }
 
   FetchSyncRecords(bookmarks, history, preferences, 1000);
@@ -1064,6 +1103,7 @@ BraveSyncServiceImpl::BookmarkNodeToSyncBookmark(
   std::string order;
   node->GetMetaInfo("order", &order);
   bookmark->order = order;
+  DCHECK(!order.empty());
 
   auto* deleted_node = GetDeletedNodeRoot();
   CHECK(deleted_node);
@@ -1071,23 +1111,7 @@ BraveSyncServiceImpl::BookmarkNodeToSyncBookmark(
   if (record->objectId.empty()) {
     record->objectId = tools::GenerateObjectId();
     record->action = jslib::SyncRecord::Action::CREATE;
-
-    DCHECK(bookmark->order.empty());
-    int index = node->parent()->GetIndexOf(node);
-    // TODO(bridiver) - this isn't good because the logic for determining order
-    // shouldn't be in both the sync js lib and the c++ code, but using the
-    // callback here is problematic. Need to find a better way to handle this
-    if (node->parent()->is_permanent_node()) {
-      bookmark->order =
-          sync_prefs_->GetBookmarksBaseOrder() +
-          std::to_string(index);
-    } else {
-      std::string order;
-      node->parent()->GetMetaInfo("order", &order);
-      DCHECK(!order.empty());
-      bookmark->order = order + "." + std::to_string(index);
-    }
-    bookmark_model_->SetNodeMetaInfo(node, "order", bookmark->order);
+    bookmark_model_->SetNodeMetaInfo(node, "object_id", record->objectId);
   } else if (node->HasAncestor(deleted_node)) {
    record->action = jslib::SyncRecord::Action::DELETE;
   } else {

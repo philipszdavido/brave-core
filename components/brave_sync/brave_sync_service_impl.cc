@@ -683,6 +683,7 @@ uint64_t GetIndex(const bookmarks::BookmarkNode* root_node,
   return index;
 }
 
+// this should only be called for resolved records we get from the server
 void UpdateNode(bookmarks::BookmarkModel* model,
                 const bookmarks::BookmarkNode* node,
                 const jslib::SyncRecord* record) {
@@ -696,6 +697,7 @@ void UpdateNode(bookmarks::BookmarkModel* model,
     // sync_bookmark.site.lastAccessedTime
     // sync_bookmark.site.favicon
   }
+
   model->SetTitle(node,
       base::UTF8ToUTF16(bookmark.site.title));
   model->SetDateAdded(node, bookmark.site.creationTime);
@@ -838,13 +840,9 @@ void BraveSyncServiceImpl::OnSaveBookmarkOrder(const std::string &order,
   auto* bookmark_node = bookmarks::GetBookmarkNodeByID(
       bookmark_model_, between_order_rr_context_node_id);
 
-  std::vector<std::unique_ptr<jslib::SyncRecord>> records;
-
-  auto record = BookmarkNodeToSyncBookmark(bookmark_node);
-  if (record)
-    records.push_back(std::move(record));
-
-  sync_client_->SendSyncRecords(jslib_const::SyncRecordType_BOOKMARKS, records);
+  // clearing the sync_timestamp will put the record back in the `unsynced` list
+  if (bookmark_node)
+    bookmark_model_->DeleteNodeMetaInfo(bookmark_node, "sync_timestamp");
 }
 
 void BraveSyncServiceImpl::PushRRContext(const std::string &prev_order, const std::string &next_order, const int64_t &node_id, const int &action) {
@@ -1213,9 +1211,10 @@ void BraveSyncServiceImpl::CloneBookmarkNodeForDeleteImpl(
   bookmarks::BookmarkNode::MetaInfoMap meta_info_map = element.meta_info_map;
   meta_info_map.erase("sync_timestamp");
   cloned_node->SetMetaInfoMap(meta_info_map);
+
   auto* cloned_node_ptr = cloned_node.get();
   parent->Add(std::move(cloned_node), index);
-  // send record to the server without updating the order
+  // we call `Changed` here because we don't want to update the order
   BookmarkNodeChanged(bookmark_model_, cloned_node_ptr);
 }
 
@@ -1245,12 +1244,8 @@ void BraveSyncServiceImpl::BookmarkNodeRemoved(
 
 void BraveSyncServiceImpl::BookmarkNodeChanged(bookmarks::BookmarkModel* model,
                                           const bookmarks::BookmarkNode* node) {
-  std::vector<std::unique_ptr<jslib::SyncRecord>> records;
-  auto record = BookmarkNodeToSyncBookmark(node);
-  if (record)
-    records.push_back(std::move(record));
-
-  sync_client_->SendSyncRecords(jslib_const::SyncRecordType_BOOKMARKS, records);
+  // clearing the sync_timestamp will put the record back in the `Unsynced` list
+  model->DeleteNodeMetaInfo(node, "sync_timestamp");
 }
 
 void BraveSyncServiceImpl::SendAllLocalHistorySites() {

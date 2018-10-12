@@ -31,20 +31,6 @@ def main():
   content = ''
   xml_tree = etree.parse(source_string_path)
 
-# BSC - not sure how to properly add this
-# in an older version of the code, it looked like this:
-# # Add IDR_SETTINGS_BRAVE_SETTINGS_MENU_ICONS_HTML(icons.html)
-# brave_settings_menu_icons_html_element_len = len(xml_tree.xpath('//structure[@name="IDR_SETTINGS_BRAVE_SETTINGS_MENU_ICONS_HTML"]'))
-# if brave_settings_menu_icons_html_element_len == 0:
-#     brave_settings_menu_icons_html_element = etree.Element('structure')
-#     brave_settings_menu_icons_html_element.set('name', 'IDR_SETTINGS_BRAVE_SETTINGS_MENU_ICONS_HTML')
-#     brave_settings_menu_icons_html_element.set('file', 'brave_settings_menu/icons.html')
-#     brave_settings_menu_icons_html_element.set('type', 'chrome_html')
-#     brave_settings_menu_icons_html_element.set('preprocess', 'true')
-#     brave_settings_menu_icons_html_element.set('allowexternalscript', 'true')
-#     settings_menu_html_element = xml_tree.xpath('//structure[@name="IDR_SETTINGS_CR_SETTINGS_MENU_HTML"]')[0]
-#     settings_menu_html_element.addnext(brave_settings_menu_icons_html_element)
-
   if filename == 'brave_strings':
     elem1 = xml_tree.xpath('//message[@name="IDS_SXS_SHORTCUT_NAME"]')[0]
     elem1.text = 'Brave Nightly'

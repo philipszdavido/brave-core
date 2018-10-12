@@ -1,8 +1,16 @@
 diff --git a/chrome/browser/resources/settings/settings_menu/settings_menu.html b/chrome/browser/resources/settings/settings_menu/settings_menu.html
-index f8f22e9b9c95a9355abe36a173ad10c615a9a85f..6155bccb9fcb980e1e0ecb376877dd2940d86e7e 100644
+index f8f22e9b9c95a9355abe36a173ad10c615a9a85f..77ef589ae3f91ab3d2d85889e3aa40e86724c0dd 100644
 --- a/chrome/browser/resources/settings/settings_menu/settings_menu.html
 +++ b/chrome/browser/resources/settings/settings_menu/settings_menu.html
-@@ -14,19 +14,24 @@
+@@ -10,23 +10,32 @@
+ <link rel="import" href="../route.html">
+ <link rel="import" href="../settings_shared_css.html">
+ 
++<if expr="not _google_chrome">
++<link rel="import" href="../brave_settings_menu/icons.html">
++</if>
++
+ <dom-module id="settings-menu">
    <template>
      <style include="settings-shared">
        :host {
@@ -33,7 +41,7 @@ index f8f22e9b9c95a9355abe36a173ad10c615a9a85f..6155bccb9fcb980e1e0ecb376877dd29
          margin-inline-end: 2px;  /* Margin so selected outline is visible. */
          margin-inline-start: 1px;
          min-height: 20px;
-@@ -35,10 +40,32 @@
+@@ -35,10 +44,32 @@
          padding-top: 10px;
        }
  
@@ -67,7 +75,7 @@ index f8f22e9b9c95a9355abe36a173ad10c615a9a85f..6155bccb9fcb980e1e0ecb376877dd29
        iron-icon {
          --iron-icon-fill-color: var(--settings-nav-grey);
          margin-inline-end: 24px;
-@@ -48,6 +75,7 @@
+@@ -48,6 +79,7 @@
  
        .iron-selected > iron-icon {
          fill: var(--google-blue-700);
@@ -75,7 +83,7 @@ index f8f22e9b9c95a9355abe36a173ad10c615a9a85f..6155bccb9fcb980e1e0ecb376877dd29
        }
  
        #advancedButton {
-@@ -77,7 +105,6 @@
+@@ -77,7 +109,6 @@
        #advancedButton > iron-icon,
        #extensionsLink > iron-icon {
          @apply --cr-icon-height-width;
@@ -83,7 +91,7 @@ index f8f22e9b9c95a9355abe36a173ad10c615a9a85f..6155bccb9fcb980e1e0ecb376877dd29
        }
  
        #menuSeparator {
-@@ -86,10 +113,19 @@
+@@ -86,10 +117,19 @@
          margin-bottom: 8px;
          margin-top: 8px;
        }
@@ -103,7 +111,7 @@ index f8f22e9b9c95a9355abe36a173ad10c615a9a85f..6155bccb9fcb980e1e0ecb376877dd29
  <if expr="chromeos">
        <a href="/internet">
          <iron-icon icon="settings:network-wifi"></iron-icon>
-@@ -104,10 +140,11 @@
+@@ -104,10 +144,11 @@
          <iron-icon icon="cr:person"></iron-icon>
          $i18n{peoplePageTitle}
        </a>
@@ -114,24 +122,33 @@ index f8f22e9b9c95a9355abe36a173ad10c615a9a85f..6155bccb9fcb980e1e0ecb376877dd29
 +      <a id="extensionsLink" href="chrome://extensions" target="_blank"
 +          on-click="onExtensionsLinkClick_"
 +          title="$i18n{extensionsLinkTooltip}">
-+        <iron-icon icon="cr:extension"></iron-icon>
++        <iron-icon icon="brave_settings:misc-extensions"></iron-icon>
 +        $i18n{extensionsPageTitle}
        </a>
  <if expr="chromeos">
        <a href="/device">
-@@ -143,6 +180,11 @@
+@@ -116,7 +157,7 @@
+       </a>
+ </if>
+       <a href="/search">
+-        <iron-icon icon="cr:search"></iron-icon>
++        <iron-icon icon="brave_settings:mag-glass-search"></iron-icon>
+         $i18n{searchPageTitle}
+       </a>
+ <if expr="chromeos">
+@@ -143,6 +184,11 @@
          <iron-icon icon="settings:power-settings-new"></iron-icon>
          $i18n{onStartup}
        </a>
 +      <a id="appearance" href="/appearance"
 +        hidden="[[!pageVisibility.appearance]]">
-+        <iron-icon icon="settings:palette"></iron-icon>
++        <iron-icon icon="brave_settings:square-tab-settings"></iron-icon>
 +        $i18n{appearancePageTitle}
 +      </a>
        <paper-button toggles id="advancedButton"
            aria-active-attribute="aria-expanded" active="{{advancedOpened}}"
            hidden="[[!pageVisibility.advancedSettings]]">
-@@ -188,10 +230,12 @@
+@@ -188,10 +234,12 @@
              $i18n{multidevicePageTitle}
            </a>
  </if>
@@ -144,7 +161,7 @@ index f8f22e9b9c95a9355abe36a173ad10c615a9a85f..6155bccb9fcb980e1e0ecb376877dd29
  <if expr="not chromeos">
            <a href="/system">
              <iron-icon icon="settings:build"></iron-icon>
-@@ -205,13 +249,13 @@
+@@ -205,13 +253,13 @@
          </iron-selector>
        </iron-collapse>
        <div id="menuSeparator"></div>
@@ -154,7 +171,7 @@ index f8f22e9b9c95a9355abe36a173ad10c615a9a85f..6155bccb9fcb980e1e0ecb376877dd29
 -        <span>$i18n{extensionsPageTitle}</span>
 -        <iron-icon class="cr-icon icon-external" actionable></iron-icon>
 +      <a id="about-menu" href="/help">
-+        <iron-icon icon="settings:web"></iron-icon>
++        <iron-icon icon="brave_settings:full-color-brave-lion"></iron-icon>
 +        <div id="aboutMenuText">
 +          <div>$i18n{aboutPageTitle}</div>
 +          <div>$i18n{braveProductVersion}</div>

@@ -1302,7 +1302,7 @@ void BraveSyncServiceImpl::BookmarkNodeRemoved(
   CHECK(deleted_node);
   bookmarks::BookmarkNodeData data(node);
   CloneBookmarkNodeForDelete(
-      data.elements, deleted_node, deleted_node->child_count() + 1);
+      data.elements, deleted_node, deleted_node->child_count());
 }
 
 void BraveSyncServiceImpl::BookmarkNodeChanged(bookmarks::BookmarkModel* model,

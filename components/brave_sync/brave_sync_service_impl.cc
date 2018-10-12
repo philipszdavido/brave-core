@@ -262,7 +262,7 @@ void BraveSyncServiceImpl::OnDeleteDeviceFileWork(const std::string &device_id) 
 
     content::BrowserThread::PostTask(content::BrowserThread::UI, FROM_HERE,
         base::Bind(&BraveSyncServiceImpl::SendDeviceSyncRecord,
-            weak_ptr_factory_.GetWeakPtr(), jslib::SyncRecord::Action::DELETE,
+            base::Unretained(this), jslib::SyncRecord::Action::DELETE,
             device_name, device_id, object_id));
   }
 }
@@ -294,7 +294,7 @@ void BraveSyncServiceImpl::OnResetSyncFileWork(const std::string &device_id) {
 
   content::BrowserThread::PostTask(content::BrowserThread::UI, FROM_HERE,
     base::Bind(&BraveSyncServiceImpl::OnResetSyncPostFileUiWork,
-               weak_ptr_factory_.GetWeakPtr()));
+               base::Unretained(this)));
 }
 
 void BraveSyncServiceImpl::OnResetSyncPostFileUiWork() {
@@ -548,7 +548,7 @@ void BraveSyncServiceImpl::OnGetExistingObjectsFileWork(const std::string& categ
     content::BrowserThread::GetTaskRunnerForThread(content::BrowserThread::UI)
         ->PostTask(FROM_HERE, base::BindOnce(
             &BraveSyncServiceImpl::OnGetExistingObjectsOnUIThread,
-                weak_ptr_factory_.GetWeakPtr(),
+                base::Unretained(this),
                 category_name,
                 base::Passed(std::move(records_and_existing_objects))));
   } else if (category_name == jslib_const::kHistorySites) {
@@ -686,7 +686,7 @@ void BraveSyncServiceImpl::OnResolvedPreferences(std::unique_ptr<RecordsList> re
 
   content::BrowserThread::GetTaskRunnerForThread(content::BrowserThread::UI)
     ->PostTask(FROM_HERE, base::Bind(&BraveSyncServiceImpl::TriggerOnSyncStateChanged,
-                                     weak_ptr_factory_.GetWeakPtr()));
+                                     base::Unretained(this)));
 
   DLOG(INFO) << "[Brave Sync] OnResolvedPreferences OnSyncStateChanged() done";
 }
@@ -1408,7 +1408,7 @@ void BraveSyncServiceImpl::LoopProc() {
       content::BrowserThread::UI)->PostTask(
           FROM_HERE,
           base::Bind(&BraveSyncServiceImpl::LoopProcThreadAligned,
-                    weak_ptr_factory_.GetWeakPtr()));
+                    base::Unretained(this)));
 }
 
 void BraveSyncServiceImpl::LoopProcThreadAligned() {

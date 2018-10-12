@@ -81,6 +81,10 @@ void CloneBookmarkNodeForDelete(
 
 }  // namespace
 
+bool IsSyncManagedNode(const bookmarks::BookmarkPermanentNode* node) {
+  return node->id() == deleted_node_id;
+}
+
 bookmarks::BookmarkPermanentNodeList
 LoadExtraNodes(bookmarks::LoadExtraCallback callback,
                int64_t* next_node_id) {
@@ -96,6 +100,7 @@ LoadExtraNodes(bookmarks::LoadExtraCallback callback,
   node->SetTitle(base::UTF8ToUTF16("Deleted Bookmarks"));
 
   extra_nodes.push_back(std::move(node));
+
   return extra_nodes;
 }
 

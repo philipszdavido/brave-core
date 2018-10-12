@@ -25,7 +25,7 @@ bookmarks::LoadExtraCallback BraveBookmarkClient::GetLoadExtraNodesCallback() {
 
 bool BraveBookmarkClient::IsPermanentNodeVisible(
     const bookmarks::BookmarkPermanentNode* node) {
-  if (!node->IsVisible())
-    return false;
+  if (brave_sync::IsSyncManagedNode(node))
+    return false;  // don't display sync managed nodes
   return ChromeBookmarkClient::IsPermanentNodeVisible(node);
 }

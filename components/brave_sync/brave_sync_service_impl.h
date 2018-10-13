@@ -156,8 +156,6 @@ class BraveSyncServiceImpl : public BraveSyncService,
   void OnResolvedBookmarks(const RecordsList &records);
   void OnResolvedHistorySites(const RecordsList &records);
 
-  void OnResetSyncPostFileUiWork();
-
   // Other private methods
   void RequestSyncData();
   void FetchSyncRecords(const bool bookmarks, const bool history,

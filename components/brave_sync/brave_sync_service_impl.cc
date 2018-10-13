@@ -381,19 +381,13 @@ void BraveSyncServiceImpl::OnResetSync() {
           sync_client_->AsWeakPtr(),
           sync_obj_map_.get(),
           device_id),
-      base::BindOnce(&BraveSyncServiceImpl::OnResetSyncPostFileUiWork,
+      base::BindOnce(&BraveSyncServiceImpl::TriggerOnSyncStateChanged,
           weak_ptr_factory_.GetWeakPtr()));
-}
 
-void BraveSyncServiceImpl::OnResetSyncPostFileUiWork() {
-  LOG(ERROR) << "TAGAB brave_sync::BraveSyncServiceImpl::OnResetSyncPostFileUiWork";
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   sync_prefs_->Clear();
 
   sync_configured_ = false;
   sync_initialized_ = false;
-
-  TriggerOnSyncStateChanged();
 
   sync_prefs_->SetSyncThisDevice(false);
 }

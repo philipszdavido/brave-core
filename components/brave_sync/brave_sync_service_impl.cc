@@ -70,6 +70,124 @@ void GetOrder(const bookmarks::BookmarkNode* parent,
   parent->GetMetaInfo("order", parent_order);
 }
 
+RecordsListPtr CreateDeviceCreationRecordExtension(
+  const std::string &deviceName,
+  const std::string &objectId,
+  const jslib::SyncRecord::Action &action,
+  const std::string &deviceId) {
+  RecordsListPtr records = std::make_unique<RecordsList>();
+
+  SyncRecordPtr record = std::make_unique<jslib::SyncRecord>();
+
+  record->action = action;
+  record->deviceId = deviceId;
+  record->objectId = objectId;
+  record->objectData = jslib_const::SyncObjectData_DEVICE; // "device"
+
+  std::unique_ptr<jslib::Device> device = std::make_unique<jslib::Device>();
+  device->name = deviceName;
+  record->SetDevice(std::move(device));
+
+  records->emplace_back(std::move(record));
+
+  return records;
+}
+
+void SendDeviceSyncRecord(
+    base::WeakPtr<BraveSyncClient> sync_client,
+    const int &action,
+    const std::string &device_name,
+    const std::string &device_id,
+    const std::string &object_id) {
+  if (!sync_client.get())
+    return;
+
+  RecordsListPtr records = CreateDeviceCreationRecordExtension(device_name, object_id,
+    static_cast<jslib::SyncRecord::Action>(action),
+    device_id);
+  sync_client->SendSyncRecords(jslib_const::SyncRecordType_PREFERENCES, *records);
+}
+
+void OnDeleteDeviceFileWork(base::WeakPtr<BraveSyncClient> sync_client,
+                            storage::ObjectMap* sync_object_map,
+                            const std::string &device_id) {
+  VLOG(1) << "TAGAB  OnDeleteDeviceFileWork";
+  std::string json = sync_object_map->GetSpecialJSONByLocalId(jslib_const::DEVICES_NAMES);
+  SyncDevices syncDevices;
+  syncDevices.FromJson(json);
+  VLOG(1) << "TAGAB brave_sync::BraveSyncServiceImpl::OnDeleteDeviceFileWork json="<<json;
+
+  const SyncDevice *device = syncDevices.GetByDeviceId(device_id);
+  VLOG(1) << "TAGAB brave_sync::BraveSyncServiceImpl::OnDeleteDeviceFileWork device="<<device;
+  //DCHECK(device); // once I saw it nullptr
+  if (device) {
+    const std::string device_name = device->name_;
+    const std::string object_id = device->object_id_;
+    VLOG(1) << "TAGAB brave_sync::BraveSyncServiceImpl::OnDeleteDeviceFileWork device_name="<<device_name;
+    VLOG(1) << "TAGAB brave_sync::BraveSyncServiceImpl::OnDeleteDeviceFileWork object_id="<<object_id;
+
+    content::BrowserThread::PostTask(content::BrowserThread::UI, FROM_HERE,
+        base::Bind(&SendDeviceSyncRecord,
+            sync_client,
+            jslib::SyncRecord::Action::DELETE,
+            device_name,
+            device_id,
+            object_id));
+  }
+}
+
+void OnResetSyncFileWork(
+    base::WeakPtr<BraveSyncClient> sync_client,
+    storage::ObjectMap* sync_object_map,
+    const std::string &device_id) {
+  VLOG(1) << "TAGAB brave_sync::BraveSyncServiceImpl::OnResetSyncFileWork";
+  OnDeleteDeviceFileWork(sync_client, sync_object_map, device_id);
+  sync_object_map->DestroyDB();
+}
+
+SyncRecordPtr PrepareResolvedDevice(
+    SyncDevice* device,
+    int action) {
+  auto record = std::make_unique<jslib::SyncRecord>();
+
+  record->action = ConvertEnum<brave_sync::jslib::SyncRecord::Action>(action,
+      brave_sync::jslib::SyncRecord::Action::A_MIN,
+      brave_sync::jslib::SyncRecord::Action::A_MAX,
+      brave_sync::jslib::SyncRecord::Action::A_INVALID);
+  record->deviceId = device->device_id_;
+  record->objectId = device->object_id_;
+  record->objectData = jslib_const::SyncObjectData_DEVICE; // "device"
+
+  std::unique_ptr<jslib::Device> device_record = std::make_unique<jslib::Device>();
+  device_record->name = device->name_;
+  record->SetDevice(std::move(device_record));
+
+  return record;
+}
+
+std::unique_ptr<SyncRecordAndExistingList>
+PrepareResolvedPreferences(
+    storage::ObjectMap* sync_object_map,
+    std::unique_ptr<RecordsList> records) {
+  SyncDevices devices;
+  devices.FromJson(
+      sync_object_map->GetSpecialJSONByLocalId(jslib_const::DEVICES_NAMES));
+
+  auto records_and_existing_objects =
+        std::make_unique<SyncRecordAndExistingList>();
+
+  for (const SyncRecordPtr& record : *records) {
+    auto resolved_record = std::make_unique<SyncRecordAndExisting>();
+    resolved_record->first = jslib::SyncRecord::Clone(*record);
+    auto* device = devices.GetByObjectId(record->objectId);
+    if (device)
+      resolved_record->second = PrepareResolvedDevice(device, record->action);
+    records_and_existing_objects->emplace_back(std::move(resolved_record));
+  }
+
+  return records_and_existing_objects;
+}
+
 }  // namespace
 
 bool IsSyncManagedNode(const bookmarks::BookmarkPermanentNode* node) {
@@ -229,42 +347,20 @@ void BraveSyncServiceImpl::OnSetupSyncNewToSync(const std::string &device_name) 
 }
 
 void BraveSyncServiceImpl::OnDeleteDevice(const std::string &device_id) {
-  LOG(ERROR) << "TAGAB brave_sync::BraveSyncServiceImpl::OnDeleteDevice";
-  LOG(ERROR) << "TAGAB device_id="<<device_id;
+  VLOG(1) << "TAGAB brave_sync::BraveSyncServiceImpl::OnDeleteDevice";
+  VLOG(1) << "TAGAB device_id="<<device_id;
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
 
   CHECK(sync_client_ != nullptr);
   CHECK(sync_initialized_);
 
   task_runner_->PostTask(
-    FROM_HERE,
-    base::Bind(&BraveSyncServiceImpl::OnDeleteDeviceFileWork,
-               weak_ptr_factory_.GetWeakPtr(), device_id)
+      FROM_HERE,
+      base::Bind(&OnDeleteDeviceFileWork,
+          sync_client_->AsWeakPtr(),
+          sync_obj_map_.get(),
+          device_id)
   );
-}
-
-void BraveSyncServiceImpl::OnDeleteDeviceFileWork(const std::string &device_id) {
-  LOG(ERROR) << "TAGAB  BraveSyncServiceImpl::OnDeleteDeviceFileWork";
-  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  std::string json = sync_obj_map_->GetSpecialJSONByLocalId(jslib_const::DEVICES_NAMES);
-  SyncDevices syncDevices;
-  syncDevices.FromJson(json);
-  LOG(ERROR) << "TAGAB brave_sync::BraveSyncServiceImpl::OnDeleteDeviceFileWork json="<<json;
-
-  const SyncDevice *device = syncDevices.GetByDeviceId(device_id);
-  LOG(ERROR) << "TAGAB brave_sync::BraveSyncServiceImpl::OnDeleteDeviceFileWork device="<<device;
-  //DCHECK(device); // once I saw it nullptr
-  if (device) {
-    const std::string device_name = device->name_;
-    const std::string object_id = device->object_id_;
-    LOG(ERROR) << "TAGAB brave_sync::BraveSyncServiceImpl::OnDeleteDeviceFileWork device_name="<<device_name;
-    LOG(ERROR) << "TAGAB brave_sync::BraveSyncServiceImpl::OnDeleteDeviceFileWork object_id="<<object_id;
-
-    content::BrowserThread::PostTask(content::BrowserThread::UI, FROM_HERE,
-        base::Bind(&BraveSyncServiceImpl::SendDeviceSyncRecord,
-            base::Unretained(this), jslib::SyncRecord::Action::DELETE,
-            device_name, device_id, object_id));
-  }
 }
 
 void BraveSyncServiceImpl::OnResetSync() {
@@ -279,22 +375,14 @@ void BraveSyncServiceImpl::OnResetSync() {
 
   OnResetBookmarks();
 
-  task_runner_->PostTask(
-    FROM_HERE,
-    base::Bind(&BraveSyncServiceImpl::OnResetSyncFileWork,
-               weak_ptr_factory_.GetWeakPtr(), device_id)
-  );
-}
-
-void BraveSyncServiceImpl::OnResetSyncFileWork(const std::string &device_id) {
-  LOG(ERROR) << "TAGAB brave_sync::BraveSyncServiceImpl::OnResetSyncFileWork";
-  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  OnDeleteDeviceFileWork(device_id);
-  sync_obj_map_->DestroyDB();
-
-  content::BrowserThread::PostTask(content::BrowserThread::UI, FROM_HERE,
-    base::Bind(&BraveSyncServiceImpl::OnResetSyncPostFileUiWork,
-               base::Unretained(this)));
+  task_runner_->PostTaskAndReply(
+      FROM_HERE,
+      base::BindOnce(&OnResetSyncFileWork,
+          sync_client_->AsWeakPtr(),
+          sync_obj_map_.get(),
+          device_id),
+      base::BindOnce(&BraveSyncServiceImpl::OnResetSyncPostFileUiWork,
+          weak_ptr_factory_.GetWeakPtr()));
 }
 
 void BraveSyncServiceImpl::OnResetSyncPostFileUiWork() {
@@ -319,14 +407,16 @@ void BraveSyncServiceImpl::GetSettingsAndDevices(const GetSettingsAndDevicesCall
 
   // Jump to task runner thread to perform FILE operation and then back to UI
   task_runner_->PostTask(
-    FROM_HERE,
-    base::Bind(&BraveSyncServiceImpl::GetSettingsAndDevicesImpl,
-               weak_ptr_factory_.GetWeakPtr(),
-               base::Passed(std::move(settings)), callback)
+      FROM_HERE,
+      base::BindOnce(&BraveSyncServiceImpl::GetSettingsAndDevicesImpl,
+                      weak_ptr_factory_.GetWeakPtr(),
+                      std::move(settings), std::move(callback))
   );
 }
 
-void BraveSyncServiceImpl::GetSettingsAndDevicesImpl(std::unique_ptr<brave_sync::Settings> settings, const GetSettingsAndDevicesCallback &callback) {
+void BraveSyncServiceImpl::GetSettingsAndDevicesImpl(
+    std::unique_ptr<brave_sync::Settings> settings,
+    const GetSettingsAndDevicesCallback &callback) {
   LOG(ERROR) << "TAGAB brave_sync::BraveSyncServiceImpl::GetSettingsAndDevicesImpl " << GetThreadInfoString();
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
@@ -335,9 +425,8 @@ void BraveSyncServiceImpl::GetSettingsAndDevicesImpl(std::unique_ptr<brave_sync:
   devices->FromJson(json);
   LOG(ERROR) << "TAGAB brave_sync::BraveSyncServiceImpl::GetSettingsAndDevicesImpl json="<<json;
 
-  // Jump back to UI with an answer
   content::BrowserThread::PostTask(content::BrowserThread::UI, FROM_HERE,
-      base::Bind(callback,
+      base::Bind(std::move(callback),
           base::Passed(std::move(settings)),
           base::Passed(std::move(devices)))
   );
@@ -526,92 +615,24 @@ void BraveSyncServiceImpl::OnGetExistingObjects(const std::string &category_name
   }
 
   if (category_name == jslib_const::kBookmarks) {
-    SyncRecordAndExistingList records_and_existing_objects;
-    GetExistingBookmarks(*records.get(), &records_and_existing_objects);
+    auto records_and_existing_objects =
+        std::make_unique<SyncRecordAndExistingList>();
+    GetExistingBookmarks(*records.get(), records_and_existing_objects.get());
     sync_client_->SendResolveSyncRecords(
-        category_name, records_and_existing_objects);
+        category_name, std::move(records_and_existing_objects));
   } else if (category_name == brave_sync::jslib_const::kPreferences) {
-    task_runner_->PostTask(
-      FROM_HERE,
-      base::Bind(&BraveSyncServiceImpl::OnGetExistingObjectsFileWork,
-                 weak_ptr_factory_.GetWeakPtr(), category_name,
-                 base::Passed(std::move(records)), last_record_time_stamp,
-                 is_truncated));
-  }
-}
-
-void BraveSyncServiceImpl::OnGetExistingObjectsFileWork(const std::string& category_name,
-  std::unique_ptr<RecordsList> records,
-  const base::Time& last_record_time_stamp,
-  bool is_truncated) {
-  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-
-  if (category_name == jslib_const::kPreferences) {
-    SyncRecordAndExistingList records_and_existing_objects =
-                                     PrepareResolvedPreferences(*records.get());
-    content::BrowserThread::GetTaskRunnerForThread(content::BrowserThread::UI)
-        ->PostTask(FROM_HERE, base::BindOnce(
-            &BraveSyncServiceImpl::OnGetExistingObjectsOnUIThread,
-                base::Unretained(this),
-                category_name,
-                base::Passed(std::move(records_and_existing_objects))));
-  } else if (category_name == jslib_const::kHistorySites) {
-    NOTIMPLEMENTED();
-  } else {
-    NOTREACHED();
-  }
-}
-
-void BraveSyncServiceImpl::OnGetExistingObjectsOnUIThread(
-    const std::string& category_name,
-    SyncRecordAndExistingList records_and_existing_objects) {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  sync_client_->SendResolveSyncRecords(category_name,
-                                       records_and_existing_objects);
-}
-
-SyncRecordAndExistingList BraveSyncServiceImpl::PrepareResolvedPreferences(
-  const RecordsList& records) {
-  SyncRecordAndExistingList resolvedResponse;
-  for (const SyncRecordPtr& record : records ) {
-    auto resolved_record = std::make_unique<SyncRecordAndExisting>();
-    resolved_record->first = jslib::SyncRecord::Clone(*record);
-    resolved_record->second = PrepareResolvedDevice(record->objectId, record->action);
-    resolvedResponse.emplace_back(std::move(resolved_record));
-  }
-  return resolvedResponse;
-}
-
-SyncRecordPtr BraveSyncServiceImpl::PrepareResolvedDevice(
-    const std::string& object_id,
-    int action) {
-  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  std::string json = sync_obj_map_->GetSpecialJSONByLocalId(jslib_const::DEVICES_NAMES);
-  SyncDevices devices;
-  devices.FromJson(json);
-
-  SyncDevice* device = devices.GetByObjectId(object_id);
-  DLOG(INFO) << "[Brave Sync] " << __func__ << " device=" << device;
-  if (device) {
-    DLOG(INFO) << "[Brave Sync] " << __func__ << " found " << device->name_;
-    auto record = std::make_unique<jslib::SyncRecord>();
-
-    record->action = ConvertEnum<brave_sync::jslib::SyncRecord::Action>(action,
-        brave_sync::jslib::SyncRecord::Action::A_MIN,
-        brave_sync::jslib::SyncRecord::Action::A_MAX,
-        brave_sync::jslib::SyncRecord::Action::A_INVALID);
-    record->deviceId = device->device_id_;
-    record->objectId = device->object_id_;
-    record->objectData = jslib_const::SyncObjectData_DEVICE; // "device"
-
-    std::unique_ptr<jslib::Device> device_record = std::make_unique<jslib::Device>();
-    device_record->name = device->name_;
-    record->SetDevice(std::move(device_record));
-
-    return record;
-  } else {
-     DLOG(INFO) << "[Brave Sync] " << __func__ << " will ret none";
-     return nullptr;
+    base::PostTaskAndReplyWithResult(task_runner_.get(),
+        FROM_HERE,
+        base::BindOnce(
+            &PrepareResolvedPreferences,
+                // the sync object map is destroyed by the task_runner
+                // so it's always safe to pass it without WeakPtr
+                sync_obj_map_.get(),
+                std::move(records)),
+        base::BindOnce(
+            &BraveSyncClient::SendResolveSyncRecords,
+                sync_client_->AsWeakPtr(),
+                category_name));
   }
 }
 
@@ -622,12 +643,14 @@ void BraveSyncServiceImpl::OnResolvedSyncRecords(const std::string &category_nam
 
   if (category_name == brave_sync::jslib_const::kPreferences) {
     std::string this_device_id = sync_prefs_->GetThisDeviceId();
-    task_runner_->PostTask(
-      FROM_HERE,
-      base::Bind(&BraveSyncServiceImpl::OnResolvedPreferences,
-                 weak_ptr_factory_.GetWeakPtr(), base::Passed(std::move(records)),
-                 this_device_id)
-    );
+    task_runner_->PostTaskAndReply(
+        FROM_HERE,
+        base::BindOnce(&BraveSyncServiceImpl::OnResolvedPreferences,
+            weak_ptr_factory_.GetWeakPtr(),
+            std::move(records),
+            this_device_id),
+        base::BindOnce(&BraveSyncServiceImpl::TriggerOnSyncStateChanged,
+            weak_ptr_factory_.GetWeakPtr()));
   } else if (category_name == brave_sync::jslib_const::kBookmarks) {
     OnResolvedBookmarks(*records.get());
   } else if (category_name == brave_sync::jslib_const::kHistorySites) {
@@ -685,16 +708,9 @@ void BraveSyncServiceImpl::OnResolvedPreferences(
   DLOG(INFO) << "[Brave Sync] " << __func__ << " this_device_deleted=" << this_device_deleted;
   // We received request to delete the current device
   if (this_device_deleted) {
-    OnResetSyncFileWork(this_device_id);
-    return;
+    OnResetSyncFileWork(
+        sync_client_->AsWeakPtr(), sync_obj_map_.get(), this_device_id);
   }
-
-  // Inform devices list chain has been changed
-  DLOG(INFO) << "[Brave Sync] OnResolvedPreferences OnSyncStateChanged()";
-
-  content::BrowserThread::GetTaskRunnerForThread(content::BrowserThread::UI)
-    ->PostTask(FROM_HERE, base::Bind(&BraveSyncServiceImpl::TriggerOnSyncStateChanged,
-                                     base::Unretained(this)));
 
   DLOG(INFO) << "[Brave Sync] OnResolvedPreferences OnSyncStateChanged() done";
 }
@@ -1031,31 +1047,6 @@ void BraveSyncServiceImpl::FetchSyncRecords(const bool bookmarks,
     max_records);
 }
 
-namespace {
-RecordsListPtr CreateDeviceCreationRecordExtension(
-  const std::string &deviceName,
-  const std::string &objectId,
-  const jslib::SyncRecord::Action &action,
-  const std::string &deviceId) {
-  RecordsListPtr records = std::make_unique<RecordsList>();
-
-  SyncRecordPtr record = std::make_unique<jslib::SyncRecord>();
-
-  record->action = action;
-  record->deviceId = deviceId;
-  record->objectId = objectId;
-  record->objectData = jslib_const::SyncObjectData_DEVICE; // "device"
-
-  std::unique_ptr<jslib::Device> device = std::make_unique<jslib::Device>();
-  device->name = deviceName;
-  record->SetDevice(std::move(device));
-
-  records->emplace_back(std::move(record));
-
-  return records;
-}
-}
-
 void BraveSyncServiceImpl::SendCreateDevice() {
   LOG(ERROR) << "TAGAB brave_sync::BraveSyncServiceImpl::SendCreateDevice";
 
@@ -1067,23 +1058,12 @@ void BraveSyncServiceImpl::SendCreateDevice() {
   LOG(ERROR) << "TAGAB brave_sync::BraveSyncServiceImpl::SendCreateDevice deviceId=" << device_id;
   CHECK(!device_id.empty());
 
-  SendDeviceSyncRecord(jslib::SyncRecord::Action::CREATE,
-    device_name,
-    device_id,
-    object_id);
-}
-
-void BraveSyncServiceImpl::SendDeviceSyncRecord(const int &action,
-  const std::string &device_name,
-  const std::string &device_id,
-  const std::string &object_id) {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  DCHECK(sync_client_);
-
-  RecordsListPtr records = CreateDeviceCreationRecordExtension(device_name, object_id,
-    static_cast<jslib::SyncRecord::Action>(action),
-    device_id);
-  sync_client_->SendSyncRecords(jslib_const::SyncRecordType_PREFERENCES, *records);
+  SendDeviceSyncRecord(
+      sync_client_->AsWeakPtr(),
+      jslib::SyncRecord::Action::CREATE,
+      device_name,
+      device_id,
+      object_id);
 }
 
 std::unique_ptr<jslib::SyncRecord>
@@ -1421,7 +1401,8 @@ void BraveSyncServiceImpl::LoopProc() {
       content::BrowserThread::UI)->PostTask(
           FROM_HERE,
           base::Bind(&BraveSyncServiceImpl::LoopProcThreadAligned,
-                    base::Unretained(this)));
+              // the timer will always be destroyed before the service
+              base::Unretained(this)));
 }
 
 void BraveSyncServiceImpl::LoopProcThreadAligned() {

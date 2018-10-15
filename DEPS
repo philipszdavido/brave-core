@@ -15,6 +15,8 @@ deps = {
   "vendor/bip39wally-core-native": "https://github.com/brave-intl/bip39wally-core-native.git@9b119931c702d55be994117eb505d56310720b1d",
   "vendor/bat-native-anonize": "https://github.com/brave-intl/bat-native-anonize.git@adeff3254bb90ccdc9699040d5a4e1cd6b8393b7",
   "vendor/bat-native-tweetnacl": "https://github.com/brave-intl/bat-native-tweetnacl.git@1b4362968c8f22720bfb75af6f506d4ecc0f3116",
+  "components/brave_sync/extension/brave-sync": "https://github.com/brave/sync.git@52b53d9e6fc32561e143e0959d00045cb63c117c",
+  "components/brave_sync/extension/brave-crypto": "https://github.com/brave/crypto@c07866c3b9c8264195756a81112bb74b8fa90858",
 }
 
 hooks = [
@@ -34,5 +36,17 @@ hooks = [
     'name': 'init',
     'pattern': '.',
     'action': ['python', 'src/brave/script/init-brave-extension.py'],
+  },
+  {
+    # Build brave-sync
+    'name': 'build_brave_sync',
+    'pattern': '.',
+    'action': ['python', 'src/brave/script/build-simple-js-bundle.py', '--repo_dir_path', 'src/brave/components/brave_sync/extension/brave-sync'],
+  },
+  {
+    # Build brave-crypto
+    'name': 'build_brave_crypto',
+    'pattern': '.',
+    'action': ['python', 'src/brave/script/build-simple-js-bundle.py', '--repo_dir_path', 'src/brave/components/brave_sync/extension/brave-crypto'],
   }
 ]

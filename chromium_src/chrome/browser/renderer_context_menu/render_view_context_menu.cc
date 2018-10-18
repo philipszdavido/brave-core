@@ -62,3 +62,10 @@ void BraveRenderViewContextMenu::ExecuteCommand(int id, int event_flags) {
       RenderViewContextMenu_Chromium::ExecuteCommand(id, event_flags);
   }
 }
+
+// static
+void BraveRenderViewContextMenu::AddSpellCheckServiceItem(
+  ui::SimpleMenuModel* menu,
+  bool is_checked) {
+  // Suppress adding "Spellcheck->Ask Brave for suggestions" item
+}

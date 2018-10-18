@@ -18,6 +18,8 @@ class BraveRenderViewContextMenu : public RenderViewContextMenu_Chromium {
   void AppendBraveLinkItems() override;
   bool IsCommandIdEnabled(int command_id) const override;
   void ExecuteCommand(int id, int event_flags) override;
+  static void AddSpellCheckServiceItem(ui::SimpleMenuModel* menu,
+                                       bool is_checked);
 };
 
 // Use our own subclass as the real RenderViewContextMenu.

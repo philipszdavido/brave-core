@@ -9,6 +9,8 @@
 #include "chrome/browser/prefs/browser_prefs.h"
 #include "chrome/test/base/testing_profile.h"
 #include "chrome/test/base/testing_profile_manager.h"
+#include "components/bookmarks/browser/bookmark_model.h"
+#include "components/bookmarks/test/test_bookmark_client.h"
 #include "components/sync_preferences/pref_service_mock_factory.h"
 #include "components/sync_preferences/testing_pref_service_syncable.h"
 
@@ -30,3 +32,27 @@ std::unique_ptr<Profile> CreateBraveSyncProfile(const base::FilePath& path) {
 }
 
 }  // namespace
+
+using bookmarks::BookmarkModel;
+using bookmarks::BookmarkPermanentNode;
+
+// All into namespace brave_sync?
+namespace brave_sync {
+extern int64_t deleted_node_id;
+}
+
+// ld.lld: error: duplicate symbol: BuildFakeBookmarkModelForTests(content::BrowserContext*)
+std::unique_ptr<KeyedService> BuildFakeBookmarkModelForTests(
+    content::BrowserContext* context) {
+  // Don't need context, unless we have more than one profile
+  using namespace bookmarks;
+     std::unique_ptr<TestBookmarkClient> client(new TestBookmarkClient());
+    BookmarkPermanentNodeList extra_nodes;
+    brave_sync::deleted_node_id = 0xDE1E7ED40DE;
+    auto node = std::make_unique<BookmarkPermanentNode>(brave_sync::deleted_node_id);
+    extra_nodes.push_back(std::move(node));
+    client->SetExtraNodesToLoad(std::move(extra_nodes));
+     std::unique_ptr<BookmarkModel> model(
+        TestBookmarkClient::CreateModelWithClient(std::move(client)));
+    return model;
+}

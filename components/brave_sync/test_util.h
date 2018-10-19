@@ -9,12 +9,24 @@
 
 #include "base/files/file_path.h"
 
+class KeyedService;
 class Profile;
+
+namespace bookmarks {
+class BookmarkPermanentNode;
+}
+
+namespace content {
+class BrowserContext;
+}
 
 namespace brave_sync {
 
 std::unique_ptr<Profile> CreateBraveSyncProfile(const base::FilePath& path);
 
 }  // namespace brave_sync
+
+std::unique_ptr<KeyedService> BuildFakeBookmarkModelForTests(
+     content::BrowserContext* context);
 
 #endif  // BRAVE_COMPONENTS_BRAVE_SYNC_TEST_UTIL_H_

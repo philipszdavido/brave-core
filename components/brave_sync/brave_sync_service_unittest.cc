@@ -20,6 +20,12 @@
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
+      // Separated to easier move or remove
+      #include "base/strings/utf_string_conversions.h"
+      #include "brave/components/brave_sync/jslib_const.h"
+      #include "components/bookmarks/browser/bookmark_model.h"
+      #include "components/bookmarks/browser/bookmark_utils.h"
+
 // npm run test -- brave_unit_tests --filter=BraveSyncServiceTest.*
 
 // BraveSyncClient::methods
@@ -80,12 +86,6 @@ class MockBraveSyncServiceObserver : public BraveSyncServiceObserver {
   MOCK_METHOD2(OnHaveSyncWords, void(BraveSyncService*, const std::string&));
   MOCK_METHOD2(OnLogMessage, void(BraveSyncService*, const std::string&));
 };
-
-std::unique_ptr<KeyedService> BuildFakeBookmarkModelForTests(
-    content::BrowserContext* context) {
-  // Don't need context, unless we have more than one profile
-  return bookmarks::TestBookmarkClient::CreateModel();
-}
 
 class BraveSyncServiceTest : public testing::Test {
  public:
@@ -180,4 +180,85 @@ TEST_F(BraveSyncServiceTest, IsSyncConfiguredOnNewProfile) {
 
 TEST_F(BraveSyncServiceTest, IsSyncInitializedOnNewProfile) {
   EXPECT_FALSE(sync_service()->IsSyncInitialized());
+}
+
+TEST_F(BraveSyncServiceTest, BookmarkAdded) {
+  DLOG(INFO) << "[Brave Sync Test] TEST_F BookmarkAdded start";
+  // BraveSyncService: real
+  // BraveSyncClient: mock
+  // Invoke BraveSyncService::BookmarkAdded
+  // Expect BraveSyncClient::SendGetBookmarkOrder invoked
+  // Expect BraveSyncClient::SendSyncRecords invoked
+  EXPECT_CALL(*sync_client(), OnSyncEnabledChanged).Times(1);
+  EXPECT_CALL(*observer(), OnSyncStateChanged(sync_service())).Times(AtLeast(1));
+  sync_service()->OnSetupSyncNewToSync("UnitTestBookmarkAdded");
+  DLOG(INFO) << "[Brave Sync Test] firing start loop";
+  sync_service()->BackgroundSyncStarted(true/*startup*/);
+
+  DLOG(INFO) << "[Brave Sync Test] fired start loop";
+  auto *bookmark_model = BookmarkModelFactory::GetForBrowserContext(profile());
+  EXPECT_CALL(*sync_client(), SendGetBookmarkOrder(_,_,_))
+      .Times(AtLeast(1));
+  bookmarks::AddIfNotBookmarked(bookmark_model,
+                                 GURL("https://a.com"),
+                                 base::ASCIIToUTF16("A.com - title"));
+  // Emulate answer from client, OnSaveBookmarkOrder - not sure, should it
+  // be here as test.
+  // BookmarkChangeProcessor::PopRRContext emulates response from the mock
+  // Seems wrong, I looked on `BookmarkChangeProcessor::PushRRContext`
+  // to catch values.
+  // parent order "0" is not quite expected, but enough to get further
+  sync_service()->OnSaveBookmarkOrder("1.0.4", "", "", "0");
+  // Force service send bookmarks and fire the mock
+  EXPECT_CALL(*sync_client(), SendSyncRecords(_,_)).Times(1);
+  sync_service()->OnResolvedSyncRecords(brave_sync::jslib_const::kBookmarks,
+    std::make_unique<RecordsList>());
+  DLOG(INFO) << "[Brave Sync Test] TEST_F BookmarkAdded done";
+}
+
+TEST_F(BraveSyncServiceTest, BookmarkDeleted) {
+  DLOG(INFO) << "[Brave Sync Test] TEST_F BookmarkDeleted start";
+  // BraveSyncService: real
+  // BraveSyncClient: mock
+  // Invoke BraveSyncService::BookmarkAdded
+  // Expect BraveSyncClient::SendGetBookmarkOrder invoked
+  // Expect BraveSyncClient::SendSyncRecords invoked
+  EXPECT_CALL(*sync_client(), OnSyncEnabledChanged).Times(1);
+  EXPECT_CALL(*observer(), OnSyncStateChanged(sync_service())).Times(AtLeast(1));
+  sync_service()->OnSetupSyncNewToSync("UnitTestBookmarkAdded");
+  DLOG(INFO) << "[Brave Sync Test] firing start loop";
+  sync_service()->BackgroundSyncStarted(true /* startup */ );
+  DLOG(INFO) << "[Brave Sync Test] fired start loop";
+  auto *bookmark_model = BookmarkModelFactory::GetForBrowserContext(profile());
+  EXPECT_CALL(*sync_client(), SendGetBookmarkOrder(_,_,_))
+      .Times(AtLeast(1));
+  bookmarks::AddIfNotBookmarked(bookmark_model,
+                                 GURL("https://a.com"),
+                                 base::ASCIIToUTF16("A.com - title"));
+  // Emulate answer from client, OnSaveBookmarkOrder - not sure, should it
+  // be here as test.
+  // BookmarkChangeProcessor::PopRRContext emulates response from the mock
+  // Seems wrong, I looked on `BookmarkChangeProcessor::PushRRContext`
+  // to catch values.
+  // parent order "0" is not quite expected, but enough to get further
+  sync_service()->OnSaveBookmarkOrder("1.0.4", "", "", "0");
+  // Force service send bookmarks and fire the mock
+  EXPECT_CALL(*sync_client(), SendSyncRecords(_,_)).Times(1);
+  sync_service()->OnResolvedSyncRecords(brave_sync::jslib_const::kBookmarks,
+    std::make_unique<RecordsList>());
+
+  // And just now can actually test delete
+  std::vector<const bookmarks::BookmarkNode*> nodes;
+  bookmarks::GetMostRecentlyAddedEntries(bookmark_model, 1, &nodes);
+  ASSERT_EQ(nodes.size(), 1u);
+  ASSERT_NE(nodes.at(0), nullptr);
+  EXPECT_CALL(*sync_client(), SendSyncRecords(_,_)).Times(1); // AB: preciece with mock expect filter
+  bookmark_model->Remove(nodes.at(0));
+  // record->action = jslib::SyncRecord::Action::DELETE;
+  // <= BookmarkNodeToSyncBookmark <= BookmarkChangeProcessor::SendUnsynced
+  // <= BraveSyncServiceImpl::OnResolvedSyncRecords
+  sync_service()->OnResolvedSyncRecords(brave_sync::jslib_const::kBookmarks,
+    std::make_unique<RecordsList>());
+
+  DLOG(INFO) << "[Brave Sync Test] TEST_F BookmarkDeleted done";
 }
